@@ -60,3 +60,19 @@ output "student_subnet_ids" {
 output "router_nva_private_ip" {
   value = module.router_nva.private_ip
 }
+
+output "student_client_private_ips" {
+  description = "Private IP addresses of all student LAN client VMs."
+  value = {
+    for student, vm in module.student_client :
+    student => vm.private_ip
+  }
+}
+
+output "student_dmz_private_ips" {
+  description = "Private IP addresses of all student DMZ server VMs."
+  value = {
+    for student, vm in module.student_dmz :
+    student => vm.private_ip
+  }
+}

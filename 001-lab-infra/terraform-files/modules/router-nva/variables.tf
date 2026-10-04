@@ -28,11 +28,6 @@ variable "admin_password" {
   sensitive = true
 }
 
-variable "upstream_gateway" {
-  description = "Instructor FortiGate transit IP"
-  type        = string
-}
-
 variable "tags" {
   type    = map(string)
   default = {}

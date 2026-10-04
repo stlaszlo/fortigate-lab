@@ -27,6 +27,10 @@ module "instructor_network" {
       name           = "snet-internal"
       address_prefix = "10.0.30.0/24"
     }
+    nva = {
+      name           = "snet-nva"
+      address_prefix = "10.0.40.0/24"
+    }
   }
 
   tags = {
@@ -63,6 +67,7 @@ module "instructor_fortigate" {
   }
 }
 locals {
+  router_nva_ip = "10.0.40.4"
   student_pods = {
     student01 = {
       octet    = 1
@@ -169,10 +174,8 @@ module "router_nva" {
   location            = data.azurerm_resource_group.cohort.location
   resource_group_name = data.azurerm_resource_group.cohort.name
 
-  subnet_id          = module.instructor_network.subnet_ids["transit"]
-  private_ip_address = "10.0.0.5"
-
-  upstream_gateway = "10.0.0.4"
+  subnet_id          = module.instructor_network.subnet_ids["nva"]
+  private_ip_address = "10.0.40.4"
 
   admin_username = var.router_admin_username
   admin_password = var.router_admin_password
@@ -185,13 +188,24 @@ module "router_nva" {
   }
 }
 
-resource "azurerm_route" "transit_default_via_instructor_fg" {
+resource "azurerm_route" "nva_default_via_instructor_fg" {
   name                   = "default-via-instructor-fg"
   resource_group_name    = data.azurerm_resource_group.cohort.name
-  route_table_name       = module.instructor_network.route_table_names["transit"]
+  route_table_name       = module.instructor_network.route_table_names["nva"]
   address_prefix         = "0.0.0.0/0"
   next_hop_type          = "VirtualAppliance"
-  next_hop_in_ip_address = "10.0.0.4"
+  next_hop_in_ip_address = module.instructor_fortigate.port1_private_ip
+}
+
+resource "azurerm_route" "instructor_transit_student_via_router" {
+  for_each = local.student_pods
+
+  name                   = "${each.key}-via-transit-router"
+  resource_group_name    = data.azurerm_resource_group.cohort.name
+  route_table_name       = module.instructor_network.route_table_names["transit"]
+  address_prefix         = "10.${each.value.octet}.0.0/16"
+  next_hop_type          = "VirtualAppliance"
+  next_hop_in_ip_address = local.router_nva_ip
 }
 
 resource "azurerm_route" "student_wan_default_via_router" {
@@ -202,8 +216,9 @@ resource "azurerm_route" "student_wan_default_via_router" {
   route_table_name       = each.value.route_table_names["wan"]
   address_prefix         = "0.0.0.0/0"
   next_hop_type          = "VirtualAppliance"
-  next_hop_in_ip_address = module.router_nva.private_ip
+  next_hop_in_ip_address = local.router_nva_ip
 }
+
 module "student_fortigate" {
   source   = "./modules/fortigate"
   for_each = local.student_pods
@@ -231,6 +246,120 @@ module "student_fortigate" {
     Cohort  = "fg_basic_advanced_121026"
     Purpose = "Fortinet_Training"
     Role    = "Student_FortiGate"
+    Student = each.key
+    owner   = "Laszlo"
+  }
+}
+resource "azurerm_route" "student_lan_default_via_fortigate" {
+  for_each = local.student_pods
+
+  name                   = "default-via-student-fortigate"
+  resource_group_name    = data.azurerm_resource_group.cohort.name
+  route_table_name       = module.student_network[each.key].route_table_names["lan"]
+  address_prefix         = "0.0.0.0/0"
+  next_hop_type          = "VirtualAppliance"
+  next_hop_in_ip_address = "10.${each.value.octet}.10.4"
+}
+
+resource "azurerm_route" "student_dmz_default_via_fortigate" {
+  for_each = local.student_pods
+
+  name                   = "default-via-student-fortigate"
+  resource_group_name    = data.azurerm_resource_group.cohort.name
+  route_table_name       = module.student_network[each.key].route_table_names["dmz"]
+  address_prefix         = "0.0.0.0/0"
+  next_hop_type          = "VirtualAppliance"
+  next_hop_in_ip_address = "10.${each.value.octet}.20.4"
+}
+
+resource "azurerm_route" "student_lan_to_dmz_via_fortigate" {
+  for_each = local.student_pods
+
+  name                   = "dmz-via-student-fortigate"
+  resource_group_name    = data.azurerm_resource_group.cohort.name
+  route_table_name       = module.student_network[each.key].route_table_names["lan"]
+  address_prefix         = "10.${each.value.octet}.20.0/24"
+  next_hop_type          = "VirtualAppliance"
+  next_hop_in_ip_address = "10.${each.value.octet}.10.4"
+}
+
+resource "azurerm_route" "student_dmz_to_lan_via_fortigate" {
+  for_each = local.student_pods
+
+  name                   = "lan-via-student-fortigate"
+  resource_group_name    = data.azurerm_resource_group.cohort.name
+  route_table_name       = module.student_network[each.key].route_table_names["dmz"]
+  address_prefix         = "10.${each.value.octet}.10.0/24"
+  next_hop_type          = "VirtualAppliance"
+  next_hop_in_ip_address = "10.${each.value.octet}.20.4"
+}
+
+module "student_client" {
+  source   = "./modules/linux_vm"
+  for_each = local.student_pods
+
+  name                = "vm-${each.key}-client"
+  location            = data.azurerm_resource_group.cohort.location
+  resource_group_name = data.azurerm_resource_group.cohort.name
+
+  subnet_id  = module.student_network[each.key].subnet_ids["lan"]
+  private_ip = "10.${each.value.octet}.10.10"
+
+  role    = "client"
+  vm_size = "Standard_B2s_v2"
+
+  admin_username = each.value.username
+  admin_password = var.student_admin_password
+
+  motd = <<-EOT
+    Fortinet Training Lab
+
+    Student: ${each.key}
+    Role:    Client
+
+    IP:      10.${each.value.octet}.10.10
+    Gateway: 10.${each.value.octet}.10.4
+    DMZ:     10.${each.value.octet}.20.10
+  EOT
+
+  tags = {
+    Cohort  = "fg_basic_advanced_121026"
+    Purpose = "Fortinet_Training"
+    Role    = "Student_Client"
+    Student = each.key
+    owner   = "Laszlo"
+  }
+}
+
+module "student_dmz" {
+  source   = "./modules/linux_vm"
+  for_each = local.student_pods
+
+  name                = "vm-${each.key}-dmz"
+  location            = data.azurerm_resource_group.cohort.location
+  resource_group_name = data.azurerm_resource_group.cohort.name
+
+  subnet_id  = module.student_network[each.key].subnet_ids["dmz"]
+  private_ip = "10.${each.value.octet}.20.10"
+
+  role    = "server"
+  vm_size = "Standard_B2s_v2"
+
+  admin_username = each.value.username
+  admin_password = var.student_admin_password
+
+  motd = <<-EOT
+    Fortinet Training Lab
+    Student: ${each.key}
+    Role:    DMZ Server
+    IP:      10.${each.value.octet}.20.10
+    Gateway: 10.${each.value.octet}.20.4
+  EOT
+
+  tags = {
+    Cohort  = "fg_basic_advanced_121026"
+    Purpose = "Fortinet_Training"
+    Role    = "Student_DMZ_Server"
     Student = each.key
     owner   = "Laszlo"
   }

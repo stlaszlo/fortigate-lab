@@ -8,24 +8,3 @@ write_files:
 
 runcmd:
   - sysctl --system
-
-  # Replace Azure-learned default route with Instructor FortiGate
-  - ip route replace default via ${upstream_gateway}
-
-  # Make the route persistent using netplan
-  - |
-    cat >/etc/netplan/60-router-default.yaml <<EOF
-    network:
-      version: 2
-      ethernets:
-        eth0:
-          dhcp4: true
-          dhcp4-overrides:
-            use-routes: false
-          routes:
-            - to: 0.0.0.0/0
-              via: ${upstream_gateway}
-    EOF
-
-  - chmod 600 /etc/netplan/60-router-default.yaml
-  - netplan apply

@@ -1,0 +1,20 @@
+#cloud-config
+
+hostname: ${hostname}
+manage_etc_hosts: true
+
+package_update: true
+package_upgrade: false
+
+packages:
+${indent(2, packages_yaml)}
+
+write_files:
+  - path: /etc/motd
+    owner: root:root
+    permissions: "0644"
+    content: |
+${indent(6, motd)}
+
+runcmd:
+${indent(2, commands_yaml)}

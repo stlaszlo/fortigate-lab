@@ -44,9 +44,7 @@ resource "azurerm_linux_virtual_machine" "this" {
 
   custom_data = base64encode(templatefile(
     "${path.module}/cloud-init.yaml.tftpl",
-    {
-      upstream_gateway = var.upstream_gateway
-    }
+    {}
   ))
 
   tags = var.tags
