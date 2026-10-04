@@ -204,24 +204,25 @@ resource "azurerm_route" "student_wan_default_via_router" {
   next_hop_type          = "VirtualAppliance"
   next_hop_in_ip_address = module.router_nva.private_ip
 }
-module "student01_fortigate" {
-  source = "./modules/fortigate"
+module "student_fortigate" {
+  source   = "./modules/fortigate"
+  for_each = local.student_pods
 
-  name                = "fg-student01"
+  name                = "fg-${each.key}"
   location            = data.azurerm_resource_group.cohort.location
   resource_group_name = data.azurerm_resource_group.cohort.name
 
   vm_size = "Standard_D2s_v7"
 
-  port1_subnet_id = module.student_network["student01"].subnet_ids["wan"]
-  port2_subnet_id = module.student_network["student01"].subnet_ids["lan"]
-  port3_subnet_id = module.student_network["student01"].subnet_ids["dmz"]
+  port1_subnet_id = module.student_network[each.key].subnet_ids["wan"]
+  port2_subnet_id = module.student_network[each.key].subnet_ids["lan"]
+  port3_subnet_id = module.student_network[each.key].subnet_ids["dmz"]
 
-  port1_ip = "10.${local.student_pods["student01"].octet}.0.4"
-  port2_ip = "10.${local.student_pods["student01"].octet}.10.4"
-  port3_ip = "10.${local.student_pods["student01"].octet}.20.4"
+  port1_ip = "10.${each.value.octet}.0.4"
+  port2_ip = "10.${each.value.octet}.10.4"
+  port3_ip = "10.${each.value.octet}.20.4"
 
-  admin_username = local.student_pods["student01"].username
+  admin_username = each.value.username
   admin_password = var.student_admin_password
 
   create_management_public_ip = false
@@ -230,7 +231,7 @@ module "student01_fortigate" {
     Cohort  = "fg_basic_advanced_121026"
     Purpose = "Fortinet_Training"
     Role    = "Student_FortiGate"
-    Student = "student01"
+    Student = each.key
     owner   = "Laszlo"
   }
 }
