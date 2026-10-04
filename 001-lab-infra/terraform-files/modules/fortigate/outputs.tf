@@ -3,7 +3,7 @@ output "vm_id" {
 }
 
 output "management_public_ip" {
-  value = azurerm_public_ip.management.ip_address
+  value = var.create_management_public_ip ? azurerm_public_ip.management[0].ip_address : null
 }
 
 output "port1_private_ip" {

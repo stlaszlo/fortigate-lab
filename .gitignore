@@ -6,3 +6,4 @@
 
 # Local variables
 terraform.tfvars
+*.auto.tfvars

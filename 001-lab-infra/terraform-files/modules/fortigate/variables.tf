@@ -25,19 +25,36 @@ variable "admin_password" {
   sensitive = true
 }
 
-variable "transit_subnet_id" {
+variable "port1_subnet_id" {
   type = string
 }
 
-variable "internal_subnet_id" {
+variable "port2_subnet_id" {
   type = string
 }
 
-variable "management_subnet_id" {
+variable "port3_subnet_id" {
   type = string
 }
 
 variable "tags" {
   type    = map(string)
   default = {}
+}
+
+variable "create_management_public_ip" {
+  type    = bool
+  default = false
+}
+
+variable "port1_ip" {
+  type = string
+}
+
+variable "port2_ip" {
+  type = string
+}
+
+variable "port3_ip" {
+  type = string
 }

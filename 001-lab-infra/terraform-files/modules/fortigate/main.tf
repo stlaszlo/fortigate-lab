@@ -1,4 +1,5 @@
 resource "azurerm_public_ip" "management" {
+  count               = var.create_management_public_ip ? 1 : 0
   name                = "${var.name}-pip-mgmt"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -10,47 +11,52 @@ resource "azurerm_public_ip" "management" {
 }
 
 resource "azurerm_network_interface" "port1" {
-  name                = "${var.name}-nic-port1"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  name                           = "${var.name}-nic-port1"
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
   accelerated_networking_enabled = true
-  ip_forwarding_enabled = true
+  ip_forwarding_enabled          = true
 
   ip_configuration {
     name                          = "port1"
-    subnet_id                     = var.transit_subnet_id
-    private_ip_address_allocation = "Dynamic"
+    subnet_id                     = var.port1_subnet_id
+    private_ip_address            = var.port1_ip
+    private_ip_address_allocation = "Static"
   }
 
   tags = var.tags
 }
 
 resource "azurerm_network_interface" "port2" {
-  name                = "${var.name}-nic-port2"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  name                           = "${var.name}-nic-port2"
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
   accelerated_networking_enabled = true
-  ip_forwarding_enabled = true
+  ip_forwarding_enabled          = true
 
   ip_configuration {
     name                          = "port2"
-    subnet_id                     = var.internal_subnet_id
-    private_ip_address_allocation = "Dynamic"
+    subnet_id                     = var.port2_subnet_id
+    private_ip_address            = var.port2_ip
+    private_ip_address_allocation = "Static"
   }
 
   tags = var.tags
 }
 
 resource "azurerm_network_interface" "port3" {
-  name                = "${var.name}-nic-port3"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  name                           = "${var.name}-nic-port3"
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
   accelerated_networking_enabled = true
+  ip_forwarding_enabled          = true
+
   ip_configuration {
     name                          = "port3"
-    subnet_id                     = var.management_subnet_id
-    private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = azurerm_public_ip.management.id
+    subnet_id                     = var.port3_subnet_id
+    private_ip_address            = var.port3_ip
+    private_ip_address_allocation = "Static"
+    public_ip_address_id          = var.create_management_public_ip ? azurerm_public_ip.management[0].id : null
   }
 
   tags = var.tags
