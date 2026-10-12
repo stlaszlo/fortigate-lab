@@ -12,7 +12,13 @@ locals {
       "nmap",
       "openssh-server",
       "tcpdump",
-      "traceroute"
+      "traceroute",
+      "xrdp",
+      "xorgxrdp",
+      "xfce4",
+      "xfce4-goodies",
+      "firefox",
+      "chromium-browser"
     ]
 
     server = [
@@ -50,7 +56,12 @@ locals {
 
   role_commands = {
     client = [
-      "systemctl enable --now ssh"
+      "systemctl enable --now ssh",
+      "adduser xrdp ssl-cert || true",
+      "printf 'xfce4-session\n' > /home/${var.admin_username}/.xsession",
+      "chown ${var.admin_username}:${var.admin_username} /home/${var.admin_username}/.xsession",
+      "chmod 0644 /home/${var.admin_username}/.xsession",
+      "systemctl enable --now xrdp"
     ]
 
     server = [

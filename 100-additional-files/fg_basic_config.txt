@@ -1,0 +1,43 @@
+config system interface
+    edit "port2"
+        set allowaccess https ssh
+    next
+end
+
+config firewall policy
+    edit 1
+        set name "BOOTSTRAP-LAN-INTERNET"
+        set srcintf "port2"
+        set dstintf "port1"
+        set action accept
+        set srcaddr "all"
+        set dstaddr "all"
+        set schedule "always"
+        set service "ALL"
+        set logtraffic all
+        set nat enable
+    next
+    edit 2
+        set name "BOOTSTRAP-DMZ-INTERNET"
+        set srcintf "port3"
+        set dstintf "port1"
+        set action accept
+        set srcaddr "all"
+        set dstaddr "all"
+        set schedule "always"
+        set service "ALL"
+        set logtraffic all
+        set nat enable
+    next
+    edit 3
+        set name "BOOTSTRAP-LAN-DMZ"
+        set srcintf "port2"
+        set dstintf "port3"
+        set action accept
+        set srcaddr "all"
+        set dstaddr "all"
+        set schedule "always"
+        set service "ALL"
+        set logtraffic all
+    next
+end

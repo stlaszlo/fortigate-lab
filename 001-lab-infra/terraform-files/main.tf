@@ -4,8 +4,7 @@ module "instructor_network" {
   name                = "vnet-fortinet-instructor"
   location            = data.azurerm_resource_group.cohort.location
   resource_group_name = data.azurerm_resource_group.cohort.name
-
-  address_space = "10.0.0.0/16"
+  address_space       = "10.0.0.0/16"
 
   subnets = {
     transit = {
@@ -31,6 +30,10 @@ module "instructor_network" {
       name           = "snet-nva"
       address_prefix = "10.0.40.0/24"
     }
+    oob_management = {
+      name           = "snet-oob-management"
+      address_prefix = "10.0.50.0/24"
+    }
   }
 
   tags = {
@@ -40,6 +43,21 @@ module "instructor_network" {
     owner   = "Laszlo"
   }
 }
+
+resource "azurerm_private_dns_zone_virtual_network_link" "instructor" {
+  name                  = "instructor"
+  resource_group_name   = data.azurerm_resource_group.cohort.name
+  private_dns_zone_name = azurerm_private_dns_zone.lab.name
+  virtual_network_id    = module.instructor_network.vnet_id
+  registration_enabled  = false
+  tags = {
+    Cohort  = "fg_basic_advanced_121026"
+    Purpose = "Fortinet_Training"
+    Role    = "Instructor_Hub"
+    owner   = "Laszlo"
+  }
+}
+
 module "instructor_fortigate" {
   source = "./modules/fortigate"
 
@@ -101,6 +119,10 @@ locals {
       octet    = 8
       username = "student08"
     }
+    student09 = {
+      octet    = 9
+      username = "student09"
+    }
   }
 }
 module "student_network" {
@@ -138,7 +160,22 @@ module "student_network" {
     owner   = "Laszlo"
   }
 }
+resource "azurerm_private_dns_zone_virtual_network_link" "students" {
+  for_each = local.student_pods
 
+  name                  = each.key
+  resource_group_name   = data.azurerm_resource_group.cohort.name
+  private_dns_zone_name = azurerm_private_dns_zone.lab.name
+  virtual_network_id    = module.student_network[each.key].vnet_id
+  registration_enabled  = false
+  tags = {
+    Cohort  = "fg_basic_advanced_121026"
+    Purpose = "Fortinet_Training"
+    Role    = "Student_Pod"
+    Student = each.key
+    owner   = "Laszlo"
+  }
+}
 resource "azurerm_virtual_network_peering" "instructor_to_student" {
   for_each = module.student_network
 
@@ -364,3 +401,80 @@ module "student_dmz" {
     owner   = "Laszlo"
   }
 }
+
+resource "azurerm_private_dns_a_record" "student_fortigate" {
+  for_each = local.student_pods
+
+  name                = "fortigate.s${each.value.octet}"
+  zone_name           = azurerm_private_dns_zone.lab.name
+  resource_group_name = data.azurerm_resource_group.cohort.name
+  ttl                 = 300
+
+  records = [
+    "10.${each.value.octet}.10.4"
+  ]
+}
+resource "azurerm_private_dns_a_record" "student_fortigate_wan" {
+  for_each = local.student_pods
+
+  name                = "fortigate-wan.s${each.value.octet}"
+  zone_name           = azurerm_private_dns_zone.lab.name
+  resource_group_name = data.azurerm_resource_group.cohort.name
+  ttl                 = 300
+
+  records = [
+    "10.${each.value.octet}.0.4"
+  ]
+}
+resource "azurerm_private_dns_a_record" "student_client" {
+  for_each = local.student_pods
+
+  name                = "client.s${each.value.octet}"
+  zone_name           = azurerm_private_dns_zone.lab.name
+  resource_group_name = data.azurerm_resource_group.cohort.name
+  ttl                 = 300
+
+  records = [
+    "10.${each.value.octet}.10.10"
+  ]
+}
+
+resource "azurerm_private_dns_a_record" "student_server" {
+  for_each = local.student_pods
+
+  name                = "server.s${each.value.octet}"
+  zone_name           = azurerm_private_dns_zone.lab.name
+  resource_group_name = data.azurerm_resource_group.cohort.name
+  ttl                 = 300
+
+  records = [
+    "10.${each.value.octet}.20.10"
+  ]
+}
+
+resource "azurerm_private_dns_a_record" "hub_guac" {
+  name                = "guac.hub"
+  zone_name           = azurerm_private_dns_zone.lab.name
+  resource_group_name = data.azurerm_resource_group.cohort.name
+  ttl                 = 300
+
+  records = ["10.0.50.10"]
+}
+
+resource "azurerm_private_dns_a_record" "hub_router" {
+  name                = "router.hub"
+  zone_name           = azurerm_private_dns_zone.lab.name
+  resource_group_name = data.azurerm_resource_group.cohort.name
+  ttl                 = 300
+
+  records = ["10.0.40.4"]
+}
+
+resource "azurerm_private_dns_a_record" "hub_fortigate" {
+  name                = "fortigate.hub"
+  zone_name           = azurerm_private_dns_zone.lab.name
+  resource_group_name = data.azurerm_resource_group.cohort.name
+  ttl                 = 300
+  records             = ["10.0.10.4"]
+}
+
